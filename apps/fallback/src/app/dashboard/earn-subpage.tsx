@@ -1,5 +1,4 @@
 import { metaMorphoAbi } from "@morpho-org/uikit/assets/abis/meta-morpho";
-import { metaMorphoFactoryAbi } from "@morpho-org/uikit/assets/abis/meta-morpho-factory";
 import { Avatar, AvatarFallback, AvatarImage } from "@morpho-org/uikit/components/shadcn/avatar";
 import { Card, CardContent } from "@morpho-org/uikit/components/shadcn/card";
 import { Progress } from "@morpho-org/uikit/components/shadcn/progress";
@@ -13,7 +12,6 @@ import {
   TableHeader,
   TableRow,
 } from "@morpho-org/uikit/components/shadcn/table";
-import useContractEvents from "@morpho-org/uikit/hooks/use-contract-events/use-contract-events";
 import { getContractDeploymentInfo } from "@morpho-org/uikit/lib/deployments";
 import { abbreviateAddress, formatBalanceWithSymbol, getTokenSymbolURI, Token } from "@morpho-org/uikit/lib/utils";
 import { keepPreviousData } from "@tanstack/react-query";
@@ -50,51 +48,17 @@ export function EarnSubPage() {
   const urlSearchParams = new URLSearchParams(window.location.search);
   const isDev = urlSearchParams.has("dev");
 
-  const [factory, factoryV1_1] = useMemo(
-    () => [
-      getContractDeploymentInfo(chainId, "MetaMorphoFactory"),
-      getContractDeploymentInfo(chainId, "MetaMorphoV1_1Factory"),
-    ],
-    [chainId],
-  );
+  // Factories removed
 
-  // MARK: Fetch `MetaMorphoFactory.CreateMetaMorpho` on all factory versions so that we have all deployments
-  const {
-    logs: { all: createMetaMorphoEvents },
-    isFetching: isFetchingCreateMetaMorphoEvents,
-    fractionFetched: ffCreateMetaMorphoEvents,
-  } = useContractEvents({
-    chainId,
-    abi: metaMorphoFactoryAbi,
-    address: factoryV1_1 ? [factoryV1_1.address].concat(factory ? [factory.address] : []) : [],
-    fromBlock: factory?.fromBlock ?? factoryV1_1?.fromBlock,
-    reverseChronologicalOrder: true,
-    eventName: "CreateMetaMorpho",
-    strict: true,
-    query: { enabled: chainId !== undefined },
-  });
+  // Factory indexing removed
+  const createMetaMorphoEvents: { args: { metaMorpho: Address; asset: Address } }[] = [];
+  const isFetchingCreateMetaMorphoEvents = false;
+  const ffCreateMetaMorphoEvents = 1;
 
   // MARK: Fetch `ERC4626.Deposit` so that we know where user has deposited. Includes non-MetaMorpho ERC4626 deposits
-  const {
-    logs: { all: depositEvents },
-    isFetching: isFetchingDepositEvents,
-    fractionFetched: ffDepositEvents,
-  } = useContractEvents({
-    chainId,
-    abi: erc4626Abi,
-    fromBlock: factory?.fromBlock ?? factoryV1_1?.fromBlock,
-    reverseChronologicalOrder: true,
-    eventName: "Deposit", // ERC-4626
-    args: { receiver: userAddress },
-    strict: true,
-    query: {
-      enabled:
-        chainId !== undefined &&
-        userAddress !== undefined &&
-        // Wait to fetch so we don't get rate-limited.
-        !isFetchingCreateMetaMorphoEvents,
-    },
-  });
+  const depositEvents: { address: string }[] = [];
+  const isFetchingDepositEvents = false;
+  const ffDepositEvents = 1;
 
   // MARK: Figure out what vaults the user is actually in, and the set of assets involved
   const [filteredCreateMetaMorphoArgs, assets] = useMemo(() => {
