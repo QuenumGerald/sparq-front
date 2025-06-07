@@ -1,8 +1,6 @@
 import { AccrualPosition } from "@morpho-org/blue-sdk";
 import { restructure } from "@morpho-org/blue-sdk-viem";
-import { metaMorphoFactoryAbi } from "@morpho-org/uikit/assets/abis/meta-morpho-factory";
 import { morphoAbi } from "@morpho-org/uikit/assets/abis/morpho";
-import useContractEvents from "@morpho-org/uikit/hooks/use-contract-events/use-contract-events";
 import { readAccrualVaults, readAccrualVaultsStateOverride } from "@morpho-org/uikit/lens/read-vaults";
 import { CORE_DEPLOYMENTS, getContractDeploymentInfo } from "@morpho-org/uikit/lib/deployments";
 import { Token } from "@morpho-org/uikit/lib/utils";
@@ -27,31 +25,13 @@ export function BorrowSubPage() {
   const { chain } = useOutletContext() as { chain?: Chain };
   const chainId = chain?.id;
 
-  const [morpho, factory, factoryV1_1] = useMemo(
-    () => [
-      getContractDeploymentInfo(chainId, "Morpho"),
-      getContractDeploymentInfo(chainId, "MetaMorphoFactory"),
-      getContractDeploymentInfo(chainId, "MetaMorphoV1_1Factory"),
-    ],
+  const [morpho] = useMemo(
+    () => [getContractDeploymentInfo(chainId, "Morpho")],
     [chainId],
   );
 
   const borrowingRewards = useMerklOpportunities({ chainId, subType: Merkl.SubType.BORROW });
 
-  // MARK: Index `MetaMorphoFactory.CreateMetaMorpho` on all factory versions to get a list of all vault addresses
-  const {
-    logs: { all: createMetaMorphoEvents },
-    fractionFetched,
-  } = useContractEvents({
-    chainId,
-    abi: metaMorphoFactoryAbi,
-    address: factoryV1_1 ? [factoryV1_1.address].concat(factory ? [factory.address] : []) : [],
-    fromBlock: factory?.fromBlock ?? factoryV1_1?.fromBlock,
-    reverseChronologicalOrder: true,
-    eventName: "CreateMetaMorpho",
-    strict: true,
-    query: { enabled: chainId !== undefined },
-  });
 
   // MARK: Fetch additional data for vaults owned by the top 1000 curators from core deployments
   const topCurators = useTopNCurators({ n: "all", verifiedOnly: true, chainIds: [...CORE_DEPLOYMENTS] });
@@ -59,13 +39,13 @@ export function BorrowSubPage() {
     chainId,
     ...readAccrualVaults(
       morpho?.address ?? "0x",
-      createMetaMorphoEvents.map((ev) => ev.args.metaMorpho),
+      [],
       // NOTE: This assumes that if a curator controls an address on one chain, they control it across all chains.
       topCurators.flatMap((curator) => curator.addresses?.map((entry) => entry.address as Address) ?? []),
     ),
     stateOverride: [readAccrualVaultsStateOverride()],
     query: {
-      enabled: chainId !== undefined && fractionFetched > 0.99 && !!morpho?.address,
+      enabled: chainId !== undefined && !!morpho?.address,
       staleTime: STALE_TIME,
       gcTime: Infinity,
       notifyOnChangeProps: ["data"],
