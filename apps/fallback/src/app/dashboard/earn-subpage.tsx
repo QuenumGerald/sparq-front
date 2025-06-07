@@ -48,9 +48,7 @@ export function EarnSubPage() {
   const urlSearchParams = new URLSearchParams(window.location.search);
   const isDev = urlSearchParams.has("dev");
 
-  // Factories removed
-
-  // Factory indexing removed
+  // Simplified: factory logic removed
   const createMetaMorphoEvents: { args: { metaMorpho: Address; asset: Address } }[] = [];
   const isFetchingCreateMetaMorphoEvents = false;
   const ffCreateMetaMorphoEvents = 1;
