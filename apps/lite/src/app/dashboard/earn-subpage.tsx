@@ -8,6 +8,8 @@ import {
   VaultMarketPublicAllocatorConfig,
 } from "@morpho-org/blue-sdk";
 import { metaMorphoAbi } from "@morpho-org/uikit/assets/abis/meta-morpho";
+import { metaMorphoFactoryAbi } from "@morpho-org/uikit/assets/abis/meta-morpho-factory";
+import useContractEvents from "@morpho-org/uikit/hooks/use-contract-events/use-contract-events";
 import { readAccrualVaults, readAccrualVaultsStateOverride } from "@morpho-org/uikit/lens/read-vaults";
 import { CORE_DEPLOYMENTS, getContractDeploymentInfo } from "@morpho-org/uikit/lib/deployments";
 import { Token } from "@morpho-org/uikit/lib/utils";
@@ -32,13 +34,31 @@ export function EarnSubPage() {
   const { chain } = useOutletContext() as { chain?: Chain };
   const chainId = chain?.id;
 
-  const [morpho] = useMemo(
-    () => [getContractDeploymentInfo(chainId, "Morpho")],
+  const [morpho, factory, factoryV1_1] = useMemo(
+    () => [
+      getContractDeploymentInfo(chainId, "Morpho"),
+      getContractDeploymentInfo(chainId, "MetaMorphoFactory"),
+      getContractDeploymentInfo(chainId, "MetaMorphoV1_1Factory"),
+    ],
     [chainId],
   );
 
   const lendingRewards = useMerklOpportunities({ chainId, subType: Merkl.SubType.LEND });
 
+  // MARK: Index `MetaMorphoFactory.CreateMetaMorpho` on all factory versions to get a list of all vault addresses
+  const {
+    logs: { all: createMetaMorphoEvents },
+    fractionFetched,
+  } = useContractEvents({
+    chainId,
+    abi: metaMorphoFactoryAbi,
+    address: factoryV1_1 ? [factoryV1_1.address].concat(factory ? [factory.address] : []) : [],
+    fromBlock: factory?.fromBlock ?? factoryV1_1?.fromBlock,
+    reverseChronologicalOrder: true,
+    eventName: "CreateMetaMorpho",
+    strict: true,
+    query: { enabled: chainId !== undefined },
+  });
 
   // MARK: Fetch additional data for vaults owned by the top 1000 curators from core deployments
   const topCurators = useTopNCurators({ n: "all", verifiedOnly: true, chainIds: [...CORE_DEPLOYMENTS] });
@@ -46,13 +66,13 @@ export function EarnSubPage() {
     chainId,
     ...readAccrualVaults(
       morpho?.address ?? "0x",
-      [],
+      createMetaMorphoEvents.map((ev) => ev.args.metaMorpho),
       // NOTE: This assumes that if a curator controls an address on one chain, they control it across all chains.
       topCurators.flatMap((curator) => curator.addresses?.map((entry) => entry.address as Address) ?? []),
     ),
     stateOverride: [readAccrualVaultsStateOverride()],
     query: {
-      enabled: chainId !== undefined && !!morpho?.address,
+      enabled: chainId !== undefined && fractionFetched > 0.99 && !!morpho?.address,
       staleTime: STALE_TIME,
       gcTime: Infinity,
       notifyOnChangeProps: ["data"],
